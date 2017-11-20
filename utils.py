@@ -2,6 +2,19 @@ import numpy as np
 import matplotlib.image as mpimg
 import cv2
 from skimage.feature import hog
+import glob
+
+def read_images():
+    images = glob.iglob('./images/**/*.png', recursive=True)
+    cars = []
+    notcars = []
+
+    for image in images:
+        if 'non-vehicles' in image:
+            notcars.append(image)
+        else:
+            cars.append(image)
+    return cars, notcars
 
 
 def convert_color(img, conv='RGB2YCrCb'):
@@ -200,6 +213,58 @@ def extract_hog_features(imgs, cspace='RGB', orient=9,
     # Return list of feature vectors
     return features
 
+# Define a function to extract features from a list of images
+# Have this function call bin_spatial() and color_hist()
+def extract_all_features(imgs, color_space='RGB', spatial_size=(32, 32),
+                        hist_bins=32, orient=9,
+                        pix_per_cell=8, cell_per_block=2, hog_channel=0,
+                        spatial_feat=True, hist_feat=True, hog_feat=True):
+    # Create a list to append feature vectors to
+    features = []
+    # Iterate through the list of images
+    for file in imgs:
+        file_features = []
+        # Read in each one by one
+        image = mpimg.imread(file)
+        # apply color conversion if other than 'RGB'
+        if color_space != 'RGB':
+            if color_space == 'HSV':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+            elif color_space == 'LUV':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2LUV)
+            elif color_space == 'HLS':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+            elif color_space == 'YUV':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
+            elif color_space == 'YCrCb':
+                feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
+        else: feature_image = np.copy(image)
+
+        if spatial_feat == True:
+            spatial_features = bin_spatial(feature_image, size=spatial_size)
+            file_features.append(spatial_features)
+        if hist_feat == True:
+            # Apply color_hist()
+            hist_features = color_hist(feature_image, nbins=hist_bins)
+            file_features.append(hist_features[4])
+        if hog_feat == True:
+        # Call get_hog_features() with vis=False, feature_vec=True
+            if hog_channel == 'ALL':
+                hog_features = []
+                for channel in range(feature_image.shape[2]):
+                    hog_features.append(get_hog_features(feature_image[:,:,channel],
+                                        orient, pix_per_cell, cell_per_block,
+                                        vis=False, feature_vec=True))
+                hog_features = np.ravel(hog_features)
+            else:
+                hog_features = get_hog_features(feature_image[:,:,hog_channel], orient,
+                            pix_per_cell, cell_per_block, vis=False, feature_vec=True)
+            # Append the new feature vector to the features list
+            file_features.append(hog_features)
+        features.append(np.concatenate(file_features))
+    # Return list of feature vectors
+    return features
+
 # Define a function that takes an image,
 # start and stop positions in both x and y,
 # window size (x and y dimensions),
@@ -275,7 +340,7 @@ def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
     if hist_feat == True:
         hist_features = color_hist(feature_image, nbins=hist_bins)
         #6) Append features to list
-        img_features.append(hist_features)
+        img_features.append(hist_features[4])
     #7) Compute HOG features if flag is set
     if hog_feat == True:
         if hog_channel == 'ALL':
@@ -379,9 +444,13 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, ce
             spatial_features = bin_spatial(subimg, size=spatial_size)
             hist_features = color_hist(subimg, nbins=hist_bins)
 
+
             # Scale features and make a prediction
+
+            size, _ = np.shape(hist_features[4])
+            hist_features[4].reshape(shape=(1, size))
             test_features = X_scaler.transform(
-                np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1))
+                np.hstack((spatial_features, hist_features[4], hog_features)).reshape(1, -1))
             # test_features = X_scaler.transform(np.hstack((shape_feat, hist_feat)).reshape(1, -1))
             test_prediction = svc.predict(test_features)
 
