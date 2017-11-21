@@ -446,9 +446,6 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, ce
 
 
             # Scale features and make a prediction
-
-            size, _ = np.shape(hist_features[4])
-            hist_features[4].reshape(shape=(1, size))
             test_features = X_scaler.transform(
                 np.hstack((spatial_features, hist_features[4], hog_features)).reshape(1, -1))
             # test_features = X_scaler.transform(np.hstack((shape_feat, hist_feat)).reshape(1, -1))
